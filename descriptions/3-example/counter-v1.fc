@@ -1,0 +1,11 @@
+;; Counter version 1
+;; We are thrilled to present you a breakthrough of smart-contract engineering: "The Counter"
+
+;; This initial version increments stored amount by 1 each received internal message
+;; (this is the same function/version as included in 3.fc, duplicated here just for convenience)
+
+cell process_message(cell storage, int msg_value, int balance, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = storage.begin_parse();
+    int current_amount = cs.preload_uint(32);
+    return begin_cell().store_uint(current_amount + 1, 32).end_cell();
+}

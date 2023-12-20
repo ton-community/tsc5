@@ -1,0 +1,33 @@
+;; Counter version 3
+;; This version is a major improvement over version #2
+
+;; It now stores amount in cents for higher precision
+
+cell process_message(cell storage, int msg_value, int balance, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = storage.begin_parse();
+    int current_amount = cs.preload_uint(40);
+    
+    int received_amount = in_msg_body~load_uint(40);
+    current_amount += received_amount;
+
+    return begin_cell().store_uint(current_amount, 40).end_cell();
+}
+
+int get_amount() method_id {
+    cell storage = get_storage();
+    slice cs = storage.begin_parse();
+    int amount = cs.preload_uint(40);
+    return amount;
+}
+
+int get_USD_amount() method_id {
+    return get_amount() / 100;
+	;; get_amount returns amount in cents in this version,
+	;; so to get a USD amount now, we need to divide it by 100
+}
+
+;; Note how storage format changed:
+;; - from v2 (which used 32 bits to represent amount in USD)
+;; - to v3 (which uses 40 bits to represent amount in cents)
+;; That is why custom storage migration logic is necessary when upgrading from v2 to v3
+;; It is contained in "counter-mig-v2-v3.fc"

@@ -1,0 +1,53 @@
+;; Counter version 4
+;; The biggest thing that happened to Counter since Counter
+
+;; Version 4 allows you to process multiple balance changes in a single message
+;; Hooray!
+;; (let's not talk about the fact, that all balance changes could have been merged into one beforehand)
+
+cell process_message(cell storage, int msg_value, int balance, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = storage.begin_parse();
+    int current_amount = cs.preload_uint(40);
+
+	while (in_msg_body.slice_bits() >= 40) {
+    	int received_amount = in_msg_body~load_int(40);
+    	current_amount += received_amount;
+	}
+
+    return begin_cell().store_uint(current_amount, 40).end_cell();
+}
+
+;; We renamed "get_amount" to "get_raw_amount"
+;; and removed "method_id" from its method declaration,
+;; thus marking it as not intended to be used by outside code.
+;; As industry leaders, we are not afraid to cut on functionality.
+int get_raw_amount() {
+    cell storage = get_storage();
+    slice cs = storage.begin_parse();
+    int amount = cs.preload_uint(40);
+    return amount;
+}
+;; Methods might arbitrarily change from version to version,
+;; but it probably won't be a problem in versioning implementation
+
+int get_USD_amount() method_id {
+    return get_raw_amount() / 100;
+	;; get_raw_amount returns amount in cents in this version,
+	;; so to get a USD amount now, we need to divide it by 100
+}
+
+;; Storage format didn't change from v3 to v4
+;; => No custom storage migration logic is necessary
+;; => There is no code for it
+;; but an upgrade code MUST ensure that migration code being absent is intended,
+;; that is why it needs to check that "migration path" ends with the expected-version
+
+;; Also note that this version does ~load_int(40) - loads *signed* integers.
+;; This allows for negative balance changes.
+;; BUT
+;; if such a message with a negative balance (let's say of -100),
+;; which was intended to be processed by v4,
+;; is going to be received AND processed by v3,
+;; v3's code is going to read it as *unsigned* integer and treat as 1099511627676,
+;; thus producing completely incorrect results.
+;; That is why it is absolutely unacceptable to process message intended for one version by another version.

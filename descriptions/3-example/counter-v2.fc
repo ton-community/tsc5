@@ -1,0 +1,32 @@
+;; Counter version 2
+;; Our engineers worked tirelessly to deliver this long awaited upgrade
+
+;; From now on Counter supports custom increments specified in incoming messages
+
+cell process_message(cell storage, int msg_value, int balance, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = storage.begin_parse();
+    int current_amount = cs.preload_uint(32);
+    
+    int received_amount = in_msg_body~load_uint(32);
+    current_amount += received_amount;
+
+    return begin_cell().store_uint(current_amount, 32).end_cell();
+}
+
+int get_amount() method_id {
+    cell storage = get_storage();
+    slice cs = storage.begin_parse();
+    int amount = cs.preload_uint(32);
+    return amount;
+}
+
+int get_USD_amount() method_id {
+    return get_amount();
+}
+
+;; Note:
+;; Counter storage format didn't change, same 32 bits
+;; Two get-methods were added
+
+;; get_amount calls get_storage (method you need to implement) instead of get_data
+;; This way it gets its own "storage portion", without all the update info you'll include in the "whole/wrapped storage" for versioning functionality
