@@ -1,0 +1,72 @@
+;; All the code in recv_internal, get_storage, wrap_storage, and version
+;; serves as an example of the intended structure.
+
+;; The provided code is an "empty wrapper." It:
+;; + Parses "wrapped" incoming messages (discards versioning information)
+;; + "Wraps" the call to the version-specific process_message
+;; + Implements "get_storage" for version-specific get-methods
+;; However, it does not yet implement any upgrade logic, which is your task.
+
+;; The empty wrapper is provided to demonstrate
+;; how version-specific code is intended to be "wrapped" and interacted with.
+;; You may delete and rewrite as needed,
+;; but the final implementation must adhere to the same structure
+
+() recv_internal(int msg_value, int balance, cell in_msg_full, slice in_msg_body) impure {
+    in_msg_body~skip_bits(32); ;; Skip the expected version
+    in_msg_body~load_maybe_ref(); ;; Skip the expected code
+    in_msg_body~load_dict(); ;; Skip migrations
+    cell payload = in_msg_body~load_ref();
+
+    ;; ---
+    ;; here you should check if it's the first call or not based on `expected_version` as stated in the task
+    ;; if it is the first call, wrap the storage and finish execution by returning from the function
+    ;; ---
+
+    slice ds = get_data().begin_parse();
+    cell storage = ds~load_ref();
+    
+    storage = process_message(storage, msg_value, balance, in_msg_full, payload.begin_parse());
+
+    set_data(wrap_storage(-2, storage)); ;; -2 is just a random placeholder for the version
+}
+
+cell get_storage() {
+    slice cs = get_data().begin_parse();
+
+    ;; Logic to extract the storage on which the version-specific process_message and get-methods operate
+    cell storage = cs~load_ref();
+
+    return storage;
+}
+
+cell wrap_storage(int version_id, cell storage) {
+    ;; add additional data required for versioning in this cell
+    return begin_cell()
+        .store_ref(storage)
+    .end_cell();
+}
+
+;; Return the current version of the smart contract
+int version() method_id {
+    return -2; ;; Not implemented
+}
+
+;; <<<<< Custom version-specific code begins
+;; This section (everything between << and >> characters) will be fully substituted for each version.
+;; This is an IMPORTANT part, and these exact lines with <<<<< and >>>>> must be present in your code for the testing system to work correctly.
+;; All the code provided here serves as an example of the version-code, which your update code must be compatible with.
+;; Refer to the "3-example" directory for more version examples.
+
+;; from counter-v0.fc
+cell process_message(cell storage, int msg_value, int balance, cell in_msg_full, slice in_msg_body) impure {
+    slice cs = storage.begin_parse();
+    int current_amount = cs.preload_uint(32);
+    return begin_cell().store_uint(current_amount + 1, 32).end_cell();
+}
+
+cell migrate_one(cell old_storage) { ;; it's just a placeholder that is required for correct compilation
+    return old_storage;
+}
+
+;; Custom version-specific code ends >>>>>

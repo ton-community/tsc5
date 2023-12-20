@@ -1,0 +1,110 @@
+diff --git a/node_modules/@ton-community/sandbox/dist/blockchain/SmartContract.d.ts b/node_modules/@ton-community/sandbox/dist/blockchain/SmartContract.d.ts
+index 72af8de..a25fe1f 100644
+--- a/node_modules/@ton-community/sandbox/dist/blockchain/SmartContract.d.ts
++++ b/node_modules/@ton-community/sandbox/dist/blockchain/SmartContract.d.ts
+@@ -55,6 +55,12 @@ export declare class TimeError extends Error {
+     currentTime: number;
+     constructor(address: Address, previousTxTime: number, currentTime: number);
+ }
++export declare class EmulationError extends Error {
++    error: string;
++    vmLogs?: string | undefined;
++    exitCode?: number | undefined;
++    constructor(error: string, vmLogs?: string | undefined, exitCode?: number | undefined);
++}
+ export type SmartContractSnapshot = {
+     address: Address;
+     account: ShardAccount;
+diff --git a/node_modules/@ton-community/sandbox/dist/blockchain/SmartContract.js b/node_modules/@ton-community/sandbox/dist/blockchain/SmartContract.js
+index 0ed72c3..8556138 100644
+--- a/node_modules/@ton-community/sandbox/dist/blockchain/SmartContract.js
++++ b/node_modules/@ton-community/sandbox/dist/blockchain/SmartContract.js
+@@ -12,7 +12,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
+ };
+ var _SmartContract_account, _SmartContract_parsedAccount, _SmartContract_lastTxTime, _SmartContract_verbosity;
+ Object.defineProperty(exports, "__esModule", { value: true });
+-exports.SmartContract = exports.TimeError = exports.GetMethodError = exports.createEmptyShardAccount = exports.createShardAccount = void 0;
++exports.SmartContract = exports.EmulationError = exports.TimeError = exports.GetMethodError = exports.createEmptyShardAccount = exports.createShardAccount = void 0;
+ const ton_core_1 = require("ton-core");
+ const selector_1 = require("../utils/selector");
+ function createShardAccount(args) {
+@@ -98,6 +98,15 @@ class TimeError extends Error {
+     }
+ }
+ exports.TimeError = TimeError;
++class EmulationError extends Error {
++    constructor(error, vmLogs, exitCode) {
++        super(`Error while executing transaction: ${error}`);
++        this.error = error;
++        this.vmLogs = vmLogs;
++        this.exitCode = exitCode;
++    }
++}
++exports.EmulationError = EmulationError;
+ class SmartContract {
+     constructor(shardAccount, blockchain) {
+         _SmartContract_account.set(this, void 0);
+@@ -181,6 +190,11 @@ class SmartContract {
+         };
+     }
+     receiveMessage(message, params) {
++        // Sync now with blockchain instance if not specified in parameters
++        params = {
++            now: this.blockchain.now,
++            ...params,
++        };
+         return this.runCommon(() => this.blockchain.executor.runTransaction({
+             ...this.createCommonArgs(params),
+             message: (0, ton_core_1.beginCell)().store((0, ton_core_1.storeMessage)(message)).endCell(),
+@@ -198,8 +212,7 @@ class SmartContract {
+             console.log(res.logs);
+         }
+         if (!res.result.success) {
+-            console.error('Error:', res.result.error, 'VM logs', res.result.vmResults);
+-            throw new Error('Error executing transaction');
++            throw new EmulationError(res.result.error, res.result.vmResults?.vmLog, res.result.vmResults?.vmExitCode);
+         }
+         if (this.verbosity.print && this.verbosity.vmLogs !== 'none' && res.result.vmLog.length > 0) {
+             console.log(res.result.vmLog);
+@@ -249,7 +262,7 @@ class SmartContract {
+         if (this.verbosity.print && this.verbosity.debugLogs && res.debugLogs.length > 0) {
+             console.log(res.debugLogs);
+         }
+-        if (res.output.vm_exit_code !== 0) {
++        if (res.output.vm_exit_code !== 0 && res.output.vm_exit_code !== 1) {
+             throw new GetMethodError(res.output.vm_exit_code, BigInt(res.output.gas_used), res.logs, res.output.vm_log, res.debugLogs);
+         }
+         const resStack = (0, ton_core_1.parseTuple)(ton_core_1.Cell.fromBase64(res.output.stack));
+diff --git a/node_modules/@ton-community/sandbox/dist/index.d.ts b/node_modules/@ton-community/sandbox/dist/index.d.ts
+index 6ca612c..a712872 100644
+--- a/node_modules/@ton-community/sandbox/dist/index.d.ts
++++ b/node_modules/@ton-community/sandbox/dist/index.d.ts
+@@ -3,7 +3,7 @@ export { Blockchain, SendMessageResult, BlockchainTransaction, PendingMessage, S
+ export { BlockchainContractProvider, SandboxContractProvider, } from './blockchain/BlockchainContractProvider';
+ export { BlockchainSender, } from './blockchain/BlockchainSender';
+ export { BlockchainStorage, LocalBlockchainStorage, RemoteBlockchainStorage, RemoteBlockchainStorageClient, wrapTonClient4ForRemote, } from './blockchain/BlockchainStorage';
+-export { Verbosity, LogsVerbosity, SmartContract, SmartContractTransaction, MessageParams, GetMethodParams, GetMethodResult, createEmptyShardAccount, createShardAccount, GetMethodError, TimeError, SmartContractSnapshot, } from './blockchain/SmartContract';
++export { Verbosity, LogsVerbosity, SmartContract, SmartContractTransaction, MessageParams, GetMethodParams, GetMethodResult, createEmptyShardAccount, createShardAccount, GetMethodError, TimeError, SmartContractSnapshot, EmulationError, } from './blockchain/SmartContract';
+ export { TickOrTock, } from './executor/Executor';
+ export { Event, EventAccountCreated, EventAccountDestroyed, EventMessageSent, } from './event/Event';
+ export { Treasury, TreasuryContract, } from './treasury/Treasury';
+diff --git a/node_modules/@ton-community/sandbox/dist/index.js b/node_modules/@ton-community/sandbox/dist/index.js
+index ae1a9fe..a0bb533 100644
+--- a/node_modules/@ton-community/sandbox/dist/index.js
++++ b/node_modules/@ton-community/sandbox/dist/index.js
+@@ -1,6 +1,6 @@
+ "use strict";
+ Object.defineProperty(exports, "__esModule", { value: true });
+-exports.internal = exports.printTransactionFees = exports.prettyLogTransactions = exports.prettyLogTransaction = exports.TreasuryContract = exports.TimeError = exports.GetMethodError = exports.createShardAccount = exports.createEmptyShardAccount = exports.SmartContract = exports.wrapTonClient4ForRemote = exports.RemoteBlockchainStorage = exports.LocalBlockchainStorage = exports.BlockchainSender = exports.BlockchainContractProvider = exports.Blockchain = exports.defaultConfigSeqno = exports.defaultConfig = void 0;
++exports.internal = exports.printTransactionFees = exports.prettyLogTransactions = exports.prettyLogTransaction = exports.TreasuryContract = exports.EmulationError = exports.TimeError = exports.GetMethodError = exports.createShardAccount = exports.createEmptyShardAccount = exports.SmartContract = exports.wrapTonClient4ForRemote = exports.RemoteBlockchainStorage = exports.LocalBlockchainStorage = exports.BlockchainSender = exports.BlockchainContractProvider = exports.Blockchain = exports.defaultConfigSeqno = exports.defaultConfig = void 0;
+ var defaultConfig_1 = require("./config/defaultConfig");
+ Object.defineProperty(exports, "defaultConfig", { enumerable: true, get: function () { return defaultConfig_1.defaultConfig; } });
+ Object.defineProperty(exports, "defaultConfigSeqno", { enumerable: true, get: function () { return defaultConfig_1.defaultConfigSeqno; } });
+@@ -20,6 +20,7 @@ Object.defineProperty(exports, "createEmptyShardAccount", { enumerable: true, ge
+ Object.defineProperty(exports, "createShardAccount", { enumerable: true, get: function () { return SmartContract_1.createShardAccount; } });
+ Object.defineProperty(exports, "GetMethodError", { enumerable: true, get: function () { return SmartContract_1.GetMethodError; } });
+ Object.defineProperty(exports, "TimeError", { enumerable: true, get: function () { return SmartContract_1.TimeError; } });
++Object.defineProperty(exports, "EmulationError", { enumerable: true, get: function () { return SmartContract_1.EmulationError; } });
+ var Treasury_1 = require("./treasury/Treasury");
+ Object.defineProperty(exports, "TreasuryContract", { enumerable: true, get: function () { return Treasury_1.TreasuryContract; } });
+ var prettyLogTransaction_1 = require("./utils/prettyLogTransaction");
