@@ -4,10 +4,10 @@
 
 ## 📝 Tasks
 
-1. [Shortest path](/contracts/1.fc)
-2. [Task name](/contracts/2.fc)
-3. [Task name](/contracts/3.fc)
-4. [Task name](/contracts/4.fc)
+1. [Inheritance Smart Contract](/contracts/1.fc)
+2. [Splitter Smart Contract](/contracts/2.fc)
+3. [Universal Versioning Template](/contracts/3.fc)
+4. [Quantum Maze](/contracts/4.fc)
 
 The goal of the contestants is to provide a code that matches the description.
 
