@@ -4,10 +4,10 @@
 
 ## 📝 Tasks
 
-1. [Inheritance Smart Contract](/contracts/1.fc)
-2. [Splitter Smart Contract](/contracts/2.fc)
-3. [Universal Versioning Template](/contracts/3.fc)
-4. [Quantum Maze](/contracts/4.fc)
+1. [Inheritance Smart Contract](/descriptions/1.md)
+2. [Splitter Smart Contract](/descriptions/2.md)
+3. [Universal Versioning Template](/descriptions/3.md)
+4. [Quantum Maze](/descriptions/4.md)
 
 The goal of the contestants is to provide a code that matches the description.
 
