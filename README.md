@@ -57,9 +57,9 @@ The pool of **$20,000 in Toncoin** will be split equally between the top 100 par
 
 Prize pool distribution:
 
-$7,000 in TON - The top 15 of participants
-$7,000 in TON - 16-45th participant
-$6,000 in TON - 46-100th participant
+- $7,000 in TON - The top 15 of participants
+- $7,000 in TON - 16-45th participant
+- $6,000 in TON - 46-100th participant
 
 ## 🚀 Getting Started with TON
 
