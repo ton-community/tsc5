@@ -1,5 +1,95 @@
-#include "imports/stdlib.fc";
+// SPDX-License-Identifier: MIT
+pragma ton-solidity >= 0.45.0;
+pragma AbiHeader expire;
 
-() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+contract Splitter {
 
+    // Storage structure to store contract data
+    struct Store {
+        address admin_address;
+        mapping(uint256 => uint32) users;
+    }
+
+    // Mapping to store data for each contract
+    mapping(address => Store) public stores;
+
+    // Modifier to ensure that only the admin can call certain functions
+    modifier onlyAdmin(address contractAddress) {
+        require(msg.sender == stores[contractAddress].admin_address, 120);
+        _;
+    }
+
+    // Modifier to ensure that the contract has users
+    modifier hasUsers(address contractAddress) {
+        require(Object.keys(stores[contractAddress].users).length > 0, 122);
+        _;
+    }
+
+    // Function to initialize the contract
+    function init_store(address contractAddress, address adminAddress) external {
+        // Ensure that the contract is not already initialized
+        require(stores[contractAddress].admin_address == address(0), 118);
+
+        // Initialize the contract data
+        stores[contractAddress].admin_address = adminAddress;
+    }
+
+    // Function to add or update a user
+    function add_user(uint64 queryId, address userAddress, uint32 share) external onlyAdmin(msg.sender) {
+        // Add or update the user in the storage
+        stores[msg.sender].users[userAddress.data()] = share;
+    }
+
+    // Function to remove a user
+    function remove_user(uint64 queryId, address userAddress) external onlyAdmin(msg.sender) {
+        // Remove the user from the storage
+        require(stores[msg.sender].users[userAddress.data()] > 0, 121);
+        delete stores[msg.sender].users[userAddress.data()];
+    }
+
+    // Function to split TON among users
+    function split_ton(uint64 queryId) external hasUsers(msg.sender) {
+        Store storage store = stores[msg.sender];
+        
+        // Calculate total share
+        uint32 totalShare;
+        for (uint32 share : store.users.values()) {
+            totalShare += share;
+        }
+
+        // Distribute TON among users
+        for (address userAddress : store.users.keys()) {
+            uint32 userShare = store.users[userAddress];
+            uint128 amount = (1e9 * uint128(userShare)) / totalShare;  // 1 nanoTON per share
+            tvm.sendValue(userAddress, amount, 1, 0);
+        }
+    }
+
+    // Function to transfer notification (Jetton)
+    function transfer_notification(uint64 queryId, uint128 amount) external hasUsers(msg.sender) {
+        Store storage store = stores[msg.sender];
+
+        // Distribute tokens among users
+        for (address userAddress : store.users.keys()) {
+            uint32 userShare = store.users[userAddress];
+            uint128 userAmount = (uint128(userShare) * amount) / uint128(store.users.size());
+            address jettonAddress = 0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef;  // Replace with the actual Jetton address
+            tvm.sendValue(jettonAddress, userAmount, 1, 0);
+        }
+    }
+
+    // Function to get users and their shares
+    function get_users() external view returns (mapping(uint256, uint32)) {
+        return stores[msg.sender].users;
+    }
+
+    // Function to get a specific user's share
+    function get_user_share(address userAddress) external view returns (uint32) {
+        return stores[msg.sender].users[userAddress.data()];
+    }
+
+    // Fallback function to receive TONs
+    receive() external {
+        // Accept incoming TONs
+    }
 }
