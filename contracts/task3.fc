@@ -1,5 +1,79 @@
-#include "imports/stdlib.fc";
+// SPDX-License-Identifier: MIT
+pragma ton-solidity >= 0.45.0;
+pragma AbiHeader expire;
 
-() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+interface IProcessMessage {
+    function process_message(cell storage, ^Cell payload) external;
+}
 
+interface IVersioning {
+    function migrate_one(cell storage, cell old_storage) external;
+}
+
+contract VersioningTemplate {
+
+    // Main smart contract data
+    cell public data;
+
+    // Versioning data
+    int public version;
+
+    // Mapping for migrations
+    mapping(int => cell) public migrations;
+
+    // Initialize the contract with version 0
+    constructor() public {
+        version = 0;
+    }
+
+    // Receive and process internal messages
+    function recv_internal(int expected_version, cell update_code, mapping(int => cell) migrations, ^Cell payload) external {
+        // Check if an update is necessary
+        if (expected_version < version) {
+            // Check if update code is attached
+            if (tvm.cellSize(update_code) > 0) {
+                // Execute the update code
+                tvm.rawReserve(1000);  // Reserve some gas for the code execution
+                tvm.insert(0, update_code);
+                tvm.rawCommit();
+            } else {
+                // Throw an error if update code is missing
+                tvm.fail(200);
+            }
+        }
+
+        // Check if migrations are provided
+        if (migrations.exists(expected_version) && migrations.exists(version)) {
+            // Migrate the storage if needed
+            for (int i = version + 1; i <= expected_version; i++) {
+                if (migrations.exists(i)) {
+                    IVersioning(migrations[i]).migrate_one(data);
+                }
+            }
+        } else {
+            // Throw an error if migrations are missing
+            tvm.fail(400);
+        }
+
+        // Execute the process_message logic
+        IProcessMessage(data).process_message(data, payload);
+    }
+
+    // Get the main smart contract's unwrapped storage
+    function get_storage() external view returns (cell) {
+        return data;
+    }
+
+    // Wrap the main contract's storage with versioning data
+    function wrap_storage(int new_version, cell storage) external view returns (cell) {
+        return tvm.buildCell(
+            tvm.buildTuple(new_version, migrations[new_version]),
+            storage
+        );
+    }
+
+    // Get the current version of the smart contract
+    function version() external view returns (int) {
+        return version;
+    }
 }
